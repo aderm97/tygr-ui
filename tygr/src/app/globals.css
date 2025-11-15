@@ -1,0 +1,206 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* TYGR Brand Colors - Tiger Orange & Black Theme */
+  --tygr-orange: 24 100% 50%; /* #FF8C00 */
+  --tygr-orange-light: 24 100% 60%;
+  --tygr-orange-dark: 24 100% 40%;
+  --tygr-black: 0 0% 0%; /* #000000 */
+  --tygr-gray-50: 0 0% 98%;
+  --tygr-gray-100: 0 0% 96%;
+  --tygr-gray-200: 0 0% 90%;
+  --tygr-gray-300: 0 0% 83%;
+  --tygr-gray-400: 0 0% 64%;
+  --tygr-gray-500: 0 0% 45%;
+  --tygr-gray-600: 0 0% 32%;
+  --tygr-gray-700: 0 0% 25%;
+  --tygr-gray-800: 0 0% 15%;
+  --tygr-gray-900: 0 0% 9%;
+  
+  /* Security Severity Colors */
+  --severity-critical: 0 84% 60%;
+  --severity-high: 24 100% 50%;
+  --severity-medium: 45 93% 47%;
+  --severity-low: 217 91% 60%;
+  --severity-info: 215 20% 65%;
+  
+  /* Background Colors */
+  --background: 0 0% 100%;
+  --foreground: 0 0% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 9%;
+  --primary: 24 100% 50%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 96%;
+  --secondary-foreground: 0 0% 9%;
+  --muted: 0 0% 96%;
+  --muted-foreground: 0 0% 45%;
+  --accent: 24 100% 50%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
+  --ring: 24 100% 50%;
+  
+  /* Border Radius */
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: 0 0% 9%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 24 100% 50%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 0 0% 15%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 64%;
+  --accent: 24 100% 50%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 15%;
+  --input: 0 0% 15%;
+  --ring: 24 100% 50%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Custom scrollbar for security-focused UI */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: var(--radius);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: var(--radius);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--foreground));
+}
+
+/* Terminal-style monospace font for security content */
+.terminal-font {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Monaco, 'Ubuntu Mono', monospace;
+}
+
+/* Security severity badges */
+.severity-critical {
+  background-color: hsl(var(--severity-critical));
+  color: white;
+}
+
+.severity-high {
+  background-color: hsl(var(--severity-high));
+  color: white;
+}
+
+.severity-medium {
+  background-color: hsl(var(--severity-medium));
+  color: black;
+}
+
+.severity-low {
+  background-color: hsl(var(--severity-low));
+  color: white;
+}
+
+.severity-info {
+  background-color: hsl(var(--severity-info));
+  color: white;
+}
+
+/* Agent status indicators */
+.agent-status-running {
+  color: hsl(var(--severity-low));
+}
+
+.agent-status-waiting {
+  color: hsl(var(--severity-medium));
+}
+
+.agent-status-completed {
+  color: hsl(var(--severity-info));
+}
+
+.agent-status-error {
+  color: hsl(var(--severity-critical));
+}
+
+/* TYGR specific animations */
+@keyframes tygr-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.tygr-pulse {
+  animation: tygr-pulse 2s ease-in-out infinite;
+}
+
+/* Security-focused focus states */
+.focus-security:focus {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+/* Custom utilities for security UI */
+.glass-security {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass-security {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Terminal output styling */
+.terminal-output {
+  background-color: hsl(var(--tygr-black));
+  color: hsl(var(--tygr-gray-200));
+  font-family: 'JetBrains Mono', monospace;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+
+/* Hunt progress indicators */
+.hunt-progress-complete {
+  background: linear-gradient(90deg, hsl(var(--severity-low)), hsl(var(--severity-info)));
+}
+
+.hunt-progress-running {
+  background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--severity-medium)));
+}
+
+.hunt-progress-error {
+  background: linear-gradient(90deg, hsl(var(--severity-critical)), hsl(var(--severity-high)));
+}

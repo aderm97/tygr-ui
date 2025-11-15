@@ -1,4 +1,6 @@
+import json
 import logging
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
@@ -24,11 +26,13 @@ def set_global_tracer(tracer: "Tracer") -> None:
 
 
 class Tracer:
-    def __init__(self, run_name: str | None = None):
+    def __init__(self, run_name: str | None = None, stream_events: bool = False):
         self.run_name = run_name
         self.run_id = run_name or f"run-{uuid4().hex[:8]}"
         self.start_time = datetime.now(UTC).isoformat()
         self.end_time: str | None = None
+        self.stream_events = stream_events
+        self._current_agent_id: str | None = None
 
         self.agents: dict[str, dict[str, Any]] = {}
         self.tool_executions: dict[int, dict[str, Any]] = {}
@@ -68,6 +72,46 @@ class Tracer:
 
         return self._run_dir
 
+    def _emit_json_event(self, event_type: str, data: dict[str, Any]) -> None:
+        """Emit a structured JSON event for real-time streaming."""
+        if not self.stream_events:
+            return
+
+        event = {
+            "event_id": f"evt-{uuid4().hex[:8]}",
+            "timestamp": datetime.now(UTC).isoformat(),
+            "hunt_id": self.run_id,
+            "type": event_type,
+            "data": data,
+        }
+
+        try:
+            # Write to stdout with a marker for easy parsing
+            event_json = json.dumps(event)
+            print(f"###VULN_EVENT###{event_json}", flush=True, file=sys.stdout)
+            logger.debug(f"Emitted event: {event_type}")
+        except Exception as e:
+            logger.warning(f"Failed to emit event: {e}")
+
+    def _extract_location_from_content(self, content: str) -> dict[str, Any]:
+        """Extract location information from vulnerability content."""
+        location = {}
+        
+        # Look for file paths (common patterns)
+        import re
+        file_pattern = r'(?:file|path|location):\s*([/\w\-\.]+(?:/\w+)*\.\w+)'
+        file_match = re.search(file_pattern, content, re.IGNORECASE)
+        if file_match:
+            location["file"] = file_match.group(1)
+        
+        # Look for endpoints/URLs
+        url_pattern = r'(?:endpoint|url|route|path):\s*([/\w\-\{\}\:]+)'
+        url_match = re.search(url_pattern, content, re.IGNORECASE)
+        if url_match:
+            location["endpoint"] = url_match.group(1)
+        
+        return location
+
     def add_vulnerability_report(
         self,
         title: str,
@@ -86,6 +130,18 @@ class Tracer:
 
         self.vulnerability_reports.append(report)
         logger.info(f"Added vulnerability report: {report_id} - {title}")
+
+        # Emit real-time event if streaming is enabled
+        if self.stream_events:
+            location = self._extract_location_from_content(content.strip())
+            self._emit_json_event("vulnerability_found", {
+                "report_id": report_id,
+                "title": title.strip(),
+                "content": content.strip(),
+                "severity": severity.lower().strip(),
+                "agent_id": self._current_agent_id,
+                "location": location,
+            })
 
         if self.vulnerability_found_callback:
             self.vulnerability_found_callback(
