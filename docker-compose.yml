@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # TYGR Frontend + API (Next.js)
+  # ============================================================================
+  tygr-ui:
+    build:
+      context: ./tygr
+      dockerfile: Dockerfile
+    container_name: tygr-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:tygr_password@postgres:5432/tygr
+      - REDIS_URL=redis://redis:6379
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - STRIX_LLM=${STRIX_LLM:-openai/gpt-4}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_API_BASE=${LLM_API_BASE}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET:-default-encryption-secret-change-me}
+      - ENCRYPTION_SALT=${ENCRYPTION_SALT:-default-salt}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-in-production}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - ALLOWED_ORIGINS=http://localhost:3000
+      - MAX_CONCURRENT_HUNTS=5
+    volumes:
+      # Mount Docker socket for Strix container management
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared workspace for hunt data
+      - ./workspace:/workspace
+      # Strix source code
+      - ./strix:/app/strix:ro
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - tygr-network
+    restart: unless-stopped
+
+  # ============================================================================
+  # PostgreSQL Database
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: tygr-postgres
+    environment:
+      - POSTGRES_DB=tygr
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=tygr_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - tygr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # Redis Cache & Process State
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: tygr-redis
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - tygr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # Strix Agent Base Image (built separately)
+  # ============================================================================
+  # Note: Strix containers are spawned dynamically by the Strix CLI
+  # This is just for building the base image
+  strix-builder:
+    build:
+      context: ./containers
+      dockerfile: Dockerfile
+    image: strix-agent:latest
+    profiles:
+      - build-only
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  tygr-network:
+    driver: bridge

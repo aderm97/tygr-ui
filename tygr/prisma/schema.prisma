@@ -1,0 +1,197 @@
+// Prisma schema for TYGR Security Agent
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Hunt - Main security hunt/scan
+model Hunt {
+  id                String   @id @default(cuid())
+  name              String
+  status            String   // 'pending' | 'running' | 'completed' | 'failed' | 'stopped'
+  target            String
+  targetType        String   // 'url' | 'repository' | 'directory' | 'domain' | 'ip'
+  instruction       String?
+  profile           String   // 'quick' | 'deep' | 'comprehensive' | 'custom'
+
+  // Timing
+  createdAt         DateTime @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  duration          Int?     // Duration in seconds
+
+  // Results
+  vulnerabilityCount Int     @default(0)
+  criticalCount     Int      @default(0)
+  highCount         Int      @default(0)
+  mediumCount       Int      @default(0)
+  lowCount          Int      @default(0)
+  infoCount         Int      @default(0)
+
+  // State
+  currentPhase      String?  // Current hunting phase
+  progress          Int      @default(0)  // 0-100
+  lastActivity      DateTime @default(now())
+
+  // Error handling
+  error             String?
+  errorStack        String?
+  retried           Boolean  @default(false)
+
+  // Process info
+  processId         String?  // System PID
+
+  // Relationships
+  agents            Agent[]
+  vulnerabilities   Vulnerability[]
+  events            HuntEvent[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([target])
+}
+
+// Agent - Individual security agent in the hunt
+model Agent {
+  id            String   @id @default(cuid())
+  huntId        String
+  agentType     String   // 'discovery' | 'validation' | 'reporting' | 'fixing'
+  name          String
+  instruction   String
+
+  // Hierarchy
+  parentAgentId String?
+  parentAgent   Agent?   @relation("AgentHierarchy", fields: [parentAgentId], references: [id])
+  childAgents   Agent[]  @relation("AgentHierarchy")
+
+  // Status
+  status        String   // 'pending' | 'running' | 'completed' | 'failed'
+  createdAt     DateTime @default(now())
+  startedAt     DateTime?
+  completedAt   DateTime?
+  duration      Int?     // Duration in seconds
+
+  // Results
+  iterationCount Int     @default(0)
+  findingsCount  Int     @default(0)
+  toolsUsed      String[] // Array of tool names
+
+  // Error
+  error         String?
+
+  // Relationships
+  hunt          Hunt     @relation(fields: [huntId], references: [id], onDelete: Cascade)
+  toolExecutions ToolExecution[]
+
+  @@index([huntId])
+  @@index([status])
+  @@index([agentType])
+}
+
+// Vulnerability - Security finding
+model Vulnerability {
+  id                String   @id @default(cuid())
+  huntId            String
+  agentId           String?
+
+  // Classification
+  title             String
+  severity          String   // 'critical' | 'high' | 'medium' | 'low' | 'info'
+  cwe               String?  // CWE identifier
+  cveId             String?  // CVE identifier if applicable
+
+  // Details
+  description       String
+  affectedResource  String   // URL, file path, endpoint, etc.
+  evidence          String   // Proof of vulnerability
+  remediation       String?  // How to fix it
+
+  // Classification tags
+  category          String?  // 'xss' | 'sqli' | 'rce' | 'idor' | etc.
+  owasp             String[] // OWASP Top 10 mappings
+  compliance        String[] // Compliance mappings (PCI-DSS, HIPAA, etc.)
+
+  // Metadata
+  discoveredAt      DateTime @default(now())
+  verified          Boolean  @default(false)
+  falsePositive     Boolean  @default(false)
+
+  // Relationships
+  hunt              Hunt     @relation(fields: [huntId], references: [id], onDelete: Cascade)
+
+  @@index([huntId])
+  @@index([severity])
+  @@index([category])
+}
+
+// ToolExecution - Record of tool usage by agents
+model ToolExecution {
+  id            String   @id @default(cuid())
+  agentId       String
+
+  // Tool info
+  tool          String   // 'browser' | 'terminal' | 'python' | 'http_proxy'
+  action        String   // Specific action taken
+
+  // Input/Output
+  input         Json     // Tool input parameters
+  output        Json?    // Tool output/result
+
+  // Status
+  success       Boolean
+  error         String?
+
+  // Timing
+  executedAt    DateTime @default(now())
+  duration      Int?     // Execution time in ms
+
+  // Relationships
+  agent         Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@index([tool])
+}
+
+// HuntEvent - Real-time event stream
+model HuntEvent {
+  id              String   @id @default(cuid())
+  huntId          String
+
+  // Event details
+  type            String   // 'agent_created' | 'tool_execution' | 'vulnerability_found' | etc.
+  sequenceNumber  Int      // For ordering events
+  timestamp       DateTime @default(now())
+
+  // Event data (flexible JSON)
+  data            Json
+
+  // Optional references
+  agentId         String?
+
+  // Relationships
+  hunt            Hunt     @relation(fields: [huntId], references: [id], onDelete: Cascade)
+
+  @@index([huntId])
+  @@index([type])
+  @@index([sequenceNumber])
+  @@index([timestamp])
+}
+
+// Settings - User configuration
+model Settings {
+  id            String   @id @default(cuid())
+  key           String   @unique  // Setting key (e.g., 'llm.provider')
+  value         Json     // Setting value (flexible JSON)
+  encrypted     Boolean  @default(false)  // Whether value is encrypted
+
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@index([key])
+}
