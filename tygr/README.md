@@ -1,36 +1,208 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TYGR Security Agent
 
-## Getting Started
+Production-ready Next.js UI for Strix CLI with real-time hunt execution and monitoring.
 
-First, run the development server:
+## Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+TYGR uses a queue-based architecture for reliable, scalable security hunting:
+
+```
+UI → API Routes → BullMQ (Redis) → Worker → Strix CLI → WebSocket → UI
+                      ↓
+                 PostgreSQL
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Key Features:**
+- ✅ Real-time event streaming (<100ms latency)
+- ✅ Queue-based job processing with automatic retries
+- ✅ WebSocket broadcasting for live updates
+- ✅ Database persistence (PostgreSQL + Prisma)
+- ✅ Horizontal scalability (multiple workers)
+- ✅ Monitoring dashboard (Bull Board)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Quick Start
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Prerequisites
 
-## Learn More
+Before running TYGR, ensure you have:
 
-To learn more about Next.js, take a look at the following resources:
+1. **Node.js 18+**
+   ```bash
+   node --version  # Should be 18.0.0 or higher
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **PostgreSQL** (running on port 5432)
+   ```bash
+   # macOS
+   brew install postgresql@15
+   brew services start postgresql@15
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   # Ubuntu/Debian
+   sudo apt install postgresql-15
+   sudo systemctl start postgresql
 
-## Deploy on Vercel
+   # Docker
+   docker run -d --name postgres \
+     -e POSTGRES_PASSWORD=password \
+     -p 5432:5432 postgres:15
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. **Redis** (running on port 6379)
+   ```bash
+   # macOS
+   brew install redis
+   brew services start redis
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   # Ubuntu/Debian
+   sudo apt install redis-server
+   sudo systemctl start redis-server
+
+   # Docker
+   docker run -d --name redis -p 6379:6379 redis:7-alpine
+   ```
+
+4. **Python 3.9+** (for Strix CLI)
+   ```bash
+   python --version  # Should be 3.9 or higher
+   ```
+
+### Installation
+
+```bash
+# 1. Install Node.js dependencies
+npm install
+
+# 2. Configure environment
+cp .env.example .env
+
+# Edit .env with your settings:
+# - DATABASE_URL: PostgreSQL connection string
+# - REDIS_URL: Redis connection string
+# - OPENAI_API_KEY or ANTHROPIC_API_KEY: LLM provider API key
+
+# 3. Generate Prisma client and run migrations
+npx prisma generate
+npx prisma migrate dev
+
+# 4. Start the server
+npm run dev
+```
+
+Visit http://localhost:3000
+
+### Verifying Prerequisites
+
+Before running \`npm run dev\`, verify all services are running:
+
+```bash
+# Check Redis
+redis-cli ping
+# Should return: PONG
+
+# Check PostgreSQL
+psql -U postgres -c "SELECT version();"
+# Should show PostgreSQL version
+```
+
+## Configuration
+
+### Environment Variables
+
+Key configuration options (see \`.env.example\` for complete list):
+
+```env
+# Server
+PORT=3000
+NODE_ENV=development
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/tygr
+
+# Redis (required for BullMQ)
+REDIS_URL=redis://localhost:6379
+
+# Worker
+WORKER_CONCURRENCY=3  # Number of concurrent hunts
+
+# LLM Provider
+OPENAI_API_KEY=sk-...
+# OR
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+## Usage
+
+### Starting a Hunt (UI)
+
+1. Navigate to http://localhost:3000
+2. Click "New Hunt"
+3. Configure target, profile, and instructions
+4. Click "Start Hunt"
+5. Watch real-time results stream in
+
+### Starting a Hunt (API)
+
+```bash
+curl -X POST http://localhost:3000/api/hunts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Security Scan",
+    "targets": [{"type": "url", "value": "https://example.com"}],
+    "profile": "quick",
+    "instruction": "Look for XSS vulnerabilities"
+  }'
+```
+
+## Troubleshooting
+
+### "Cannot connect to Redis"
+
+```bash
+# Check if Redis is running
+redis-cli ping
+
+# Start Redis
+brew services start redis  # macOS
+sudo systemctl start redis # Linux
+docker run -d -p 6379:6379 redis:7-alpine  # Docker
+```
+
+### "Cannot connect to PostgreSQL"
+
+```bash
+# Check if PostgreSQL is running
+pg_isready
+
+# Start PostgreSQL
+brew services start postgresql@15  # macOS
+sudo systemctl start postgresql    # Linux
+docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=password postgres:15  # Docker
+```
+
+### "Strix CLI not found"
+
+```bash
+# Verify Strix is in parent directory
+ls ../strix
+
+# Test Strix manually
+cd ../strix
+python -m strix --help
+```
+
+## Documentation
+
+- **[QUICKSTART.md](./QUICKSTART.md)** - 5-minute setup guide
+- **[QUEUE_ARCHITECTURE.md](./QUEUE_ARCHITECTURE.md)** - Comprehensive architecture documentation
+
+## Stack
+
+- **Frontend:** React 18, Next.js 14, TypeScript, Zustand, TailwindCSS
+- **Backend:** Next.js API Routes, BullMQ, Socket.io
+- **Database:** PostgreSQL, Prisma ORM
+- **Queue:** Redis, BullMQ
+- **CLI:** Python (Strix)
+
+## License
+
+MIT
