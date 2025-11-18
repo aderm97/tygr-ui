@@ -1,6 +1,6 @@
 /**
- * Custom Next.js Server with Socket.io
- * This wraps the Next.js server to enable Socket.io functionality
+ * Custom Next.js Server
+ * Required for Socket.io WebSocket support
  */
 
 import { createServer } from 'http'
@@ -9,15 +9,13 @@ import next from 'next'
 import { initializeServer } from './src/lib/server-init'
 
 const dev = process.env.NODE_ENV !== 'production'
-const hostname = process.env.HOSTNAME || 'localhost'
+const hostname = process.env.HOST || 'localhost'
 const port = parseInt(process.env.PORT || '3000', 10)
 
-// Initialize Next.js
 const app = next({ dev, hostname, port })
 const handle = app.getRequestHandler()
 
-app.prepare().then(() => {
-  // Create HTTP server
+app.prepare().then(async () => {
   const httpServer = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url!, true)
@@ -29,51 +27,40 @@ app.prepare().then(() => {
     }
   })
 
-  // Initialize Socket.io and other server components
-  initializeServer(httpServer)
-
-  // Start listening
-  httpServer.listen(port, () => {
-    console.log(`
-╔═══════════════════════════════════════════════════════════════╗
-║                                                               ║
-║   ████████╗██╗   ██╗ ██████╗ ██████╗                        ║
-║   ╚══██╔══╝╚██╗ ██╔╝██╔════╝ ██╔══██╗                       ║
-║      ██║    ╚████╔╝ ██║  ███╗██████╔╝                       ║
-║      ██║     ╚██╔╝  ██║   ██║██╔══██╗                       ║
-║      ██║      ██║   ╚██████╔╝██║  ██║                       ║
-║      ╚═╝      ╚═╝    ╚═════╝ ╚═╝  ╚═╝                       ║
-║                                                               ║
-║   TYGR Security Agent - CLI-React Wrapper                   ║
-║                                                               ║
-╚═══════════════════════════════════════════════════════════════╝
-
-🚀 Server ready on http://${hostname}:${port}
-🔌 Socket.io ready on ws://${hostname}:${port}/api/socket
-🗄️  Database: ${process.env.DATABASE_URL?.split('@')[1] || 'Not configured'}
-💾 Redis: ${process.env.REDIS_URL || 'Not configured'}
-🐳 Docker: ${process.env.DOCKER_HOST || 'Not configured'}
-
-Environment: ${process.env.NODE_ENV || 'development'}
-    `)
-  })
-
-  // Graceful shutdown
-  const gracefulShutdown = async () => {
-    console.log('\n⏸️  Shutting down gracefully...')
-
-    httpServer.close(() => {
-      console.log('✅ HTTP server closed')
-      process.exit(0)
-    })
-
-    // Force shutdown after 10 seconds
-    setTimeout(() => {
-      console.error('❌ Could not close connections in time, forcefully shutting down')
-      process.exit(1)
-    }, 10000)
+  // Initialize TYGR server components (WebSocket + Worker)
+  try {
+    await initializeServer(httpServer)
+  } catch (error) {
+    console.error('Failed to initialize TYGR server:', error)
+    process.exit(1)
   }
 
-  process.on('SIGTERM', gracefulShutdown)
-  process.on('SIGINT', gracefulShutdown)
+  httpServer
+    .once('error', (err: Error) => {
+      console.error('Server error:', err)
+      process.exit(1)
+    })
+    .listen(port, () => {
+      console.log(`> Ready on http://${hostname}:${port}`)
+      console.log('> TYGR Security Agent is running')
+      console.log('> WebSocket server: Ready')
+      console.log('> Hunt worker: Ready')
+    })
+
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, closing server...')
+    httpServer.close(() => {
+      console.log('HTTP server closed')
+      process.exit(0)
+    })
+  })
+
+  process.on('SIGINT', async () => {
+    console.log('SIGINT received, closing server...')
+    httpServer.close(() => {
+      console.log('HTTP server closed')
+      process.exit(0)
+    })
+  })
 })
